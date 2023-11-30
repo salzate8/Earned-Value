@@ -1,0 +1,10 @@
+version: '3.4'
+
+services:
+  earnedvalue:
+    image: earnedvalue
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - "8050:8050"
