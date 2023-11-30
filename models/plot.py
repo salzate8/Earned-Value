@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 import plotly.express as px
+import dash_table
+import locale
 
 # Define la función de aproximación lineal
 def linear_approx(x, start, end, dfP, M):
@@ -44,8 +46,8 @@ def linear_approx(x, start, end, dfP, M):
     return prediction
 
 # Lee el dataframe base
-#df = pd.read_excel('C:/Users/salzate/Downloads/9. Valor Ganado/data/processed/df_wbs_pr.xlsx')
-df = pd.read_excel('/Users/ramonalzate/Downloads/9. Valor Ganado/data/processed/df_wbs_pr.xlsx')
+df = pd.read_excel('C:/Users/salzate/Downloads/9. Valor Ganado/data/processed/df_wbs_pr.xlsx')
+#df = pd.read_excel('/Users/ramonalzate/Downloads/9. Valor Ganado/data/processed/df_wbs_pr.xlsx')
 app = dash.Dash(__name__)
 n=0
 max_char_length = 9
@@ -71,7 +73,25 @@ app.layout = html.Div([
         value='3616_',
         style={'font-family': 'Arial', 'font-size': '12px','width': '50%','margin': 'auto'}
     ),
-    ], style={'width': '50%', 'margin': 'auto', 'display': 'flex', 'justifyContent': 'space-between'}),
+    ], style={'width': '50%', 'margin': 'auto', 'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '20px'}),
+
+    dash_table.DataTable(
+        id='table',
+        columns=[
+            {'name': 'WBS', 'id': 'WBS'},
+            {'name': 'Comienzo Plan', 'id': 'Comienzo'},
+            {'name': 'Fin Plan', 'id': 'Fin'},
+            {'name': 'BAC', 'id': 'LB Costo COP'},
+            {'name': 'EAC', 'id': 'EAC'},
+            {'name': 'Fin Real', 'id': 'FechaFin'},
+        ],
+        style_table={'height': '100px', 'overflowY': 'auto'},
+        style_cell={
+            'fontFamily': 'Arial',
+            'fontSize': '12px',
+            'textAlign': 'center',},
+        style_header={'fontWeight': 'bold'},
+    ),
 
     html.Div([
         dcc.Graph(id='time-series-graph', style={'width': '50%', 'display': 'inline-block'}),
@@ -84,6 +104,29 @@ app.layout = html.Div([
         dcc.Graph(id='acum-bar-chart', style={'width': '50%', 'display': 'inline-block'}),
     ], style={'width': '100%', 'display': 'flex', 'justifyContent': 'space-between'})
 ])
+
+@app.callback(
+    Output('table', 'data'),
+    [Input('date-picker', 'end_date'),
+     Input('wbs-dropdown', 'value')]
+)
+def update_table(end_date, wbs_value):
+    # Filtra los datos para la última fecha seleccionada y el WBS específico
+    mask = (df['Fecha'] == end_date) & (df['WBS'] == wbs_value)
+    filtered_data = df.loc[mask, ['WBS', 'Comienzo', 'Fin', 'EAC', 'FechaFin', 'LB Costo COP']]
+    
+    # Formatea las columnas de fecha
+    filtered_data['Comienzo'] = pd.to_datetime(filtered_data['Comienzo']).dt.strftime('%Y-%m-%d')
+    filtered_data['Fin'] = pd.to_datetime(filtered_data['Fin']).dt.strftime('%Y-%m-%d')
+    filtered_data['FechaFin'] = pd.to_datetime(filtered_data['FechaFin']).dt.strftime('%Y-%m-%d')
+    filtered_data['EAC'] = filtered_data['EAC'].apply(lambda x: '{:,.0f}'.format(x))
+    filtered_data['LB Costo COP'] = filtered_data['LB Costo COP'].apply(lambda x: '{:,.0f}'.format(x))
+
+    # Convierte los datos a formato de diccionario para la tabla
+    table_data = filtered_data.to_dict('records')
+    
+    return table_data
+
 
 # Define el callback para el gráfico de barras acumulativas
 @app.callback(
@@ -118,8 +161,14 @@ def update_acum_bar_chart(start_date, end_date, wbs_value):
     data_filtered['WBS'] = data_filtered['WBS'].apply(lambda x: x[:12])
 
     # Crea el gráfico de barras
-    fig = px.bar(data_filtered, x='WBS', y='AcAcum', title=f'AC POR WBS',
-                 labels={'AcAcum': 'AC', 'WBS': 'WBS'})
+    fig = px.bar(data_filtered, x='WBS', y='AcAcum', color=data_filtered['WBS'].str[:9], title=f'AC POR WBS',
+                 labels={'AcAcum': '', 'WBS': 'WBS'})
+    fig.update_traces(showlegend=False)
+    fig.update_layout(
+        plot_bgcolor='white',  # Fondo del área del gráfico
+        paper_bgcolor='white',  # Fondo del papel o lienzo del gráfico
+        title=dict(text='AC POR WBS', x=0.5,)
+    )
     
     return fig
 
@@ -292,16 +341,15 @@ def update_graph(start_date, end_date, wbs_value):
     ]
 
     table = go.Table(
-        header=dict(values=[ 'AC', 'EV', 'PV', 'EAC']),
+        header=dict(values=[ 'AC', 'EV', 'PV']),
         cells=dict(values=[
         '{:,.0f}'.format(last_date_data['AcAcum'].iloc[0] / 1000000),
         '{:,.0f}'.format(last_date_data['EV'].iloc[0] / 1000000),
-        '{:,.0f}'.format(last_date_data['PV'].iloc[0] / 1000000),
-        '{:,.0f}'.format(last_date_data['EAC'].iloc[0] / 1000000)
+        '{:,.0f}'.format(last_date_data['PV'].iloc[0] / 1000000)
     ]),
         visible=True,
-        domain=dict(x=[0, 0.5], y=[0, 1]),
-        columnwidth=[0.8, 0.8, 0.8, 0.8]
+        domain=dict(x=[0.1, 0.5], y=[0, 1]),
+        columnwidth=[0.8, 0.8, 0.8]
     )
     layout = go.Layout(
         title='EARNED VALUE',
@@ -310,7 +358,7 @@ def update_graph(start_date, end_date, wbs_value):
             # ... (si tienes botones de actualización)
         ],
         annotations=[dict(text='Valores', showarrow=False, x=0.5, y=1.15, xref='paper', yref='paper')],
-        yaxis=dict(title='Valor'),
+        yaxis=dict(title='Valor',tickformat=',.0f'),
     )
 
     return {'data': traces+ [table], 'layout': go.Layout(title='EARNED VALUE')}
@@ -349,8 +397,8 @@ def update_graph_avance(start_date, end_date, wbs_value):
 
     layout_avance = go.Layout(
         title='CURVA S',
-        xaxis=dict(title='Fecha'),
-        yaxis=dict(title='Valor'),
+        xaxis=dict(title=''),
+        yaxis=dict(title='',tickformat='.0%',hoverformat='.0%'),
         showlegend=True,
         annotations=[
         {
