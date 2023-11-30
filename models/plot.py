@@ -431,4 +431,4 @@ def update_graph_avance(start_date, end_date, wbs_value):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, dev_tools_serve_dev_bundles=False)
+    app.run_server(debug=True, dev_tools_serve_dev_bundles=False, port=80, host='0.0.0.0')

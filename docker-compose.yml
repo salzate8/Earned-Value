@@ -7,4 +7,4 @@ services:
       context: .
       dockerfile: ./Dockerfile
     ports:
-      - "8050:8050"
+      - "2020:80"
